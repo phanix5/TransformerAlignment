@@ -247,7 +247,7 @@ def main():
     micro_batch_size = args.micro_batch_size
 
     print(f"Starting training with dataset size: {len(train_data)}")
-    
+
     preTrainedModel.train()
     num_batches = input_data_all.shape[0] // micro_batch_size
     for micro_batch in range(num_batches):
