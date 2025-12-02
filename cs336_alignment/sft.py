@@ -323,6 +323,10 @@ def main():
         ground_truths=val_ground_truths,
         reward_fn=r1_zero_reward_fn
     )
+
+
+if __name__ == "__main__":
+    main()
     
 
 
