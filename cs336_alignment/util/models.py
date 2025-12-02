@@ -15,6 +15,7 @@ def get_response_log_probs(
     # labels should be batch_size, seq_len
     log_probs = logits_log_softmax.gather(dim=-1, index=labels.unsqueeze(-1)).squeeze(-1)
 
+    token_entropy = None
     if return_token_entropy:
         token_entropy = compute_entropy(logits)
     
