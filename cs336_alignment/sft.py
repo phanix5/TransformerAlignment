@@ -191,8 +191,7 @@ def main():
     preTrainedModel = AutoModelForCausalLM.from_pretrained(
         "Qwen/Qwen2.5-Math-1.5B", 
         device_map="auto", 
-        torch_dtype=torch.bfloat16, 
-        attn_implementation="flash_attention_2"
+        torch_dtype=torch.bfloat16
     )
     load_policy_into_vllm_instance(preTrainedModel, llm)
     
