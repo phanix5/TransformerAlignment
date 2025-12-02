@@ -66,6 +66,7 @@ def log_generations(
     ground_truths: List[str],
     reward_fn: Callable[[str, str], Dict[str, float]],
     sampling_params: SamplingParams = None,
+    print_examples: bool = True,
 ):
     """
     Prompt the model to generate responses and log statistics.
@@ -76,9 +77,15 @@ def log_generations(
             include_stop_str_in_output=True
         )
 
-    # Generate responses
-    outputs = llm.generate(prompts, sampling_params)
-    generated_responses = [output.outputs[0].text for output in outputs]
+    # Generate responses in batches
+    batch_size = 5
+    generated_responses = []
+    
+    for i in range(0, len(prompts), batch_size):
+        batch_prompts = prompts[i:i + batch_size]
+        outputs = llm.generate(batch_prompts, sampling_params)
+        batch_responses = [output.outputs[0].text for output in outputs]
+        generated_responses.extend(batch_responses)
 
     # Tokenize prompts and responses for entropy calculation
     tokenized_data = tokenize_prompt_and_output(
@@ -117,14 +124,15 @@ def log_generations(
             response_length = 0
 
         # Log example details
-        print(f"Example {i+1}:")
-        print(f"  Input Prompt: {prompt}")
-        print(f"  Generated Response: {response}")
-        print(f"  Ground Truth: {ground_truth}")
-        print(f"  Reward Info: {reward_info}")
-        print(f"  Average Token Entropy: {avg_token_entropy:.4f}")
-        print(f"  Response Length: {response_length}")
-        print("-" * 50)
+        if print_examples:
+            print(f"Example {i+1}:")
+            print(f"  Input Prompt: {prompt}")
+            print(f"  Generated Response: {response}")
+            print(f"  Ground Truth: {ground_truth}")
+            print(f"  Reward Info: {reward_info}")
+            print(f"  Average Token Entropy: {avg_token_entropy:.4f}")
+            print(f"  Response Length: {response_length}")
+            print("-" * 50)
 
         # Update statistics
         total_response_len += response_length
@@ -184,6 +192,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=20, help="Batch size per optimizer step")
     parser.add_argument("--micro-batch-size", type=int, default=5, help="Microbatch size for gradient accumulation")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--save-trained", type=str, nargs='?', const="default", help="Relative path to save trained model. Defaults to data/trained_models if flag is present but no path provided.")
+    parser.add_argument("--print-examples", action="store_true", help="Print generation examples during validation")
     args = parser.parse_args()
 
     llm = init_vllm("Qwen/Qwen2.5-Math-1.5B", "cuda", 1)
@@ -241,7 +251,8 @@ def main():
             tokenizer=tokenizer,
             prompts=prompts,
             ground_truths=ground_truths,
-            reward_fn=r1_zero_reward_fn
+            reward_fn=r1_zero_reward_fn,
+            print_examples=args.print_examples
         )
         return
 
@@ -289,6 +300,21 @@ def main():
     
     # Update vLLM weights for validation
     load_policy_into_vllm_instance(preTrainedModel, llm)
+
+    if args.save_trained:
+        if args.save_trained == "default":
+            save_relative_path = "data/trained_models"
+        else:
+            save_relative_path = args.save_trained
+            
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        output_dir = os.path.join(project_root, save_relative_path)
+        
+        print(f"Saving trained model to {output_dir}...")
+        preTrainedModel.save_pretrained(save_directory=output_dir)
+        tokenizer.save_pretrained(save_directory=output_dir)
+        print("Model saved.")
     
     # Validation on test_sft.jsonl
     print("\nEvaluating on test_sft.jsonl (first 100 examples)...")
@@ -303,7 +329,8 @@ def main():
         tokenizer=tokenizer,
         prompts=test_prompts,
         ground_truths=test_ground_truths,
-        reward_fn=r1_zero_reward_fn
+        reward_fn=r1_zero_reward_fn,
+        print_examples=args.print_examples
     )
     
     # Validation on Math12K
@@ -338,7 +365,8 @@ def main():
         tokenizer=tokenizer,
         prompts=val_prompts,
         ground_truths=val_ground_truths,
-        reward_fn=r1_zero_reward_fn
+        reward_fn=r1_zero_reward_fn,
+        print_examples=args.print_examples
     )
 
 
