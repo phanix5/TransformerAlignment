@@ -169,6 +169,13 @@ def load_gsm8k_data(filename: str, limit: Optional[int] = None):
     return data
 
 
+def print_gpu_memory(tag=""):
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1024**3
+        reserved = torch.cuda.memory_reserved() / 1024**3
+        print(f"[{tag}] Allocated: {allocated:.2f} GB, Reserved: {reserved:.2f} GB")
+
+
 def main():
     parser = argparse.ArgumentParser(description="SFT Training and Generation")
     parser.add_argument("--generate", action="store_true", help="Run generation instead of training")
@@ -251,13 +258,16 @@ def main():
     preTrainedModel.train()
     num_batches = input_data_all.shape[0] // micro_batch_size
     for micro_batch in range(num_batches):
+        print_gpu_memory(f"Start Micro-batch {micro_batch}")
         batch = input_data_all[micro_batch_size * micro_batch: micro_batch_size * (micro_batch + 1)]
         labels = labels_all[micro_batch_size * micro_batch: micro_batch_size * (micro_batch + 1)]
         response_mask = response_mask_all[micro_batch_size * micro_batch: micro_batch_size * (micro_batch + 1)]
 
         log_probs_dict = get_response_log_probs(preTrainedModel, batch, labels)
+        print_gpu_memory(f"After Forward {micro_batch}")
 
         loss, _ = sft_microbatch_train_step(log_probs_dict["log_probs"], response_mask, batch_size // micro_batch_size)
+        print_gpu_memory(f"After Backward {micro_batch}")
         
         if micro_batch % 10 == 0:
             print(f"Micro-batch {micro_batch}/{num_batches}, Loss: {loss.item()}")
@@ -265,8 +275,11 @@ def main():
         # Clip gradients with L2 norm cutoff of 1.0
         if ((micro_batch + 1) * micro_batch_size) % batch_size == 0:
             torch.nn.utils.clip_grad_norm_(preTrainedModel.parameters(), 1.0)
+            print_gpu_memory(f"Before Step {micro_batch}")
             optimizer.step()
+            print_gpu_memory(f"After Step {micro_batch}")
             optimizer.zero_grad()
+            print_gpu_memory(f"After Zero Grad {micro_batch}")
             
     print("Training complete.")
     
