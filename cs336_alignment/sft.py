@@ -188,7 +188,12 @@ def main():
 
     llm = init_vllm("Qwen/Qwen2.5-Math-1.5B", "cuda", 1)
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-Math-1.5B") # load pretrained tokenizer from model
-    preTrainedModel = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-Math-1.5B", device_map="auto")
+    preTrainedModel = AutoModelForCausalLM.from_pretrained(
+        "Qwen/Qwen2.5-Math-1.5B", 
+        device_map="auto", 
+        torch_dtype=torch.bfloat16, 
+        attn_implementation="flash_attention_2"
+    )
     load_policy_into_vllm_instance(preTrainedModel, llm)
     
     # Load prompt template
