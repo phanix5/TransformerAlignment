@@ -67,6 +67,7 @@ def log_generations(
     reward_fn: Callable[[str, str], Dict[str, float]],
     sampling_params: SamplingParams = None,
     print_examples: bool = True,
+    output_file: Optional[str] = None,
 ):
     """
     Prompt the model to generate responses and log statistics.
@@ -115,6 +116,9 @@ def log_generations(
     num_correct = 0
     total_incorrect_len = 0
     num_incorrect = 0
+    
+    # Collect results for JSONL output
+    results = []
 
     for i, (prompt, response, ground_truth) in enumerate(zip(prompts, generated_responses, ground_truths)):
         # Calculate reward
@@ -152,6 +156,16 @@ def log_generations(
         else:
             total_incorrect_len += response_length
             num_incorrect += 1
+            
+        # Collect result for JSONL
+        results.append({
+            "prompt": prompt,
+            "generated_text": response,
+            "ground_truth": ground_truth,
+            "metrics": reward_info,
+            "avg_token_entropy": avg_token_entropy,
+            "response_length": response_length
+        })
 
     # Log average statistics
     avg_response_len = total_response_len / len(prompts) if len(prompts) > 0 else 0.0
@@ -164,6 +178,20 @@ def log_generations(
     print(f"  Average Response Length (Incorrect): {avg_incorrect_len:.2f}")
     accuracy = num_correct / len(prompts) if len(prompts) > 0 else 0.0
     print(f"  Accuracy: {accuracy:.2%}")
+    
+    # Write results to JSONL file if output_file is specified
+    if output_file:
+        # Ensure result directory exists
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        result_dir = os.path.join(project_root, "result")
+        os.makedirs(result_dir, exist_ok=True)
+        
+        output_path = os.path.join(result_dir, output_file)
+        with open(output_path, "w") as f:
+            for result in results:
+                f.write(json.dumps(result) + "\n")
+        print(f"Results saved to {output_path}")
 
 
 def load_gsm8k_data(filename: str, limit: Optional[int] = None):
@@ -195,12 +223,14 @@ def main():
     parser = argparse.ArgumentParser(description="SFT Training and Generation")
     parser.add_argument("--generate", action="store_true", help="Run generation instead of training")
     parser.add_argument("--prompt-indices", type=int, nargs="+", help="Indices of prompts to use from validation set")
-    parser.add_argument("--dataset-size", type=int, help="Number of items to use for training")
+    parser.add_argument("--dataset", type=str, default="math12k", choices=["math12k", "gsm8k"], help="Dataset to use for generation (default: math12k)")
+    parser.add_argument("--dataset-size", type=int, help="Number of items to use for training or generation")
     parser.add_argument("--batch-size", type=int, default=20, help="Batch size per optimizer step")
     parser.add_argument("--micro-batch-size", type=int, default=5, help="Microbatch size for gradient accumulation")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--save-trained", type=str, nargs='?', const="default", help="Relative path to save trained model. Defaults to data/trained_models if flag is present but no path provided.")
     parser.add_argument("--print-examples", action="store_true", help="Print generation examples during validation")
+    parser.add_argument("--output", type=str, default="sft_results.jsonl", help="Output file for generation results (default: sft_results.jsonl)")
     args = parser.parse_args()
 
     llm = init_vllm("Qwen/Qwen2.5-Math-1.5B", "cuda", 1)
@@ -219,38 +249,67 @@ def main():
         prompt_template = f.read()
 
     if args.generate:
-        # Load the MATH data set
-        ds = load_dataset("hiyouga/math12k")
-        
-        # Use the test set or validation set
-        if "test" in ds:
-            data = ds["test"]
-        elif "validation" in ds:
-            data = ds["validation"]
-        else:
-            print("Warning: 'test' or 'validation' split not found, using 'train'")
-            data = ds["train"]
-
-        # Select indices
-        indices = args.prompt_indices if args.prompt_indices is not None else range(10)
-
         prompts = []
         ground_truths = []
+        
+        if args.dataset == "gsm8k":
+            # Load GSM8K test data
+            limit = args.dataset_size if args.dataset_size else None
+            gsm8k_data = load_gsm8k_data("test_sft.jsonl", limit=limit)
+            
+            # Select indices if specified, otherwise use all loaded data
+            if args.prompt_indices is not None:
+                for idx in args.prompt_indices:
+                    if idx >= len(gsm8k_data):
+                        print(f"Warning: Index {idx} out of bounds, skipping.")
+                        continue
+                    prompt, response = gsm8k_data[idx]
+                    prompts.append(prompt)
+                    # Extract ground truth answer from response
+                    ground_truths.append(extract_xml_answer(response))
+            else:
+                for prompt, response in gsm8k_data:
+                    prompts.append(prompt)
+                    ground_truths.append(extract_xml_answer(response))
+                    
+            print(f"Loaded {len(prompts)} examples from GSM8K test_sft.jsonl")
+        else:
+            # Load the MATH data set (math12k)
+            ds = load_dataset("hiyouga/math12k")
+            
+            # Use the test set or validation set
+            if "test" in ds:
+                data = ds["test"]
+            elif "validation" in ds:
+                data = ds["validation"]
+            else:
+                print("Warning: 'test' or 'validation' split not found, using 'train'")
+                data = ds["train"]
 
-        for idx in indices:
-            if idx >= len(data):
-                print(f"Warning: Index {idx} out of bounds, skipping.")
-                continue
+            # Select indices
+            if args.prompt_indices is not None:
+                indices = args.prompt_indices
+            elif args.dataset_size is not None:
+                indices = range(args.dataset_size)
+            else:
+                indices = range(10)
+
+            for idx in indices:
+                if idx >= len(data):
+                    print(f"Warning: Index {idx} out of bounds, skipping.")
+                    continue
+                
+                example = data[idx]
+                # Extract question and solution
+                question = example.get("problem") or example.get("question")
+                solution = example.get("solution") or example.get("answer")
+                
+                if question and solution:
+                    formatted_prompt = prompt_template.format(question=question)
+                    prompts.append(formatted_prompt)
+                    ground_truths.append(solution)
             
-            example = data[idx]
-            # Extract question and solution
-            question = example.get("problem") or example.get("question")
-            solution = example.get("solution") or example.get("answer")
-            
-            if question and solution:
-                formatted_prompt = prompt_template.format(question=question)
-                prompts.append(formatted_prompt)
-                ground_truths.append(solution)
+            print(f"Loaded {len(prompts)} examples from Math12K")
         
         log_generations(
             llm=llm,
@@ -259,7 +318,8 @@ def main():
             prompts=prompts,
             ground_truths=ground_truths,
             reward_fn=r1_zero_reward_fn,
-            print_examples=args.print_examples
+            print_examples=args.print_examples,
+            output_file=args.output
         )
         return
 

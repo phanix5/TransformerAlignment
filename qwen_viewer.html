@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen Test Results Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d0f14;
+            --bg-secondary: #14171f;
+            --bg-tertiary: #1a1e29;
+            --bg-hover: #222838;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --text-muted: #5f6368;
+            --accent-cyan: #00d4ff;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --border: rgba(255, 255, 255, 0.08);
+            --glow-cyan: 0 0 30px rgba(0, 212, 255, 0.3);
+            --glow-purple: 0 0 30px rgba(168, 85, 247, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 380px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(168, 85, 247, 0.05));
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Stats */
+        .stats-container {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stat-card {
+            flex: 1;
+            background: var(--bg-tertiary);
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-value.success { color: var(--success); }
+        .stat-value.error { color: var(--error); }
+        .stat-value.total { color: var(--accent-cyan); }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Filters */
+        .filters {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-cyan);
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(168, 85, 247, 0.15));
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+        }
+
+        /* Search */
+        .search-container {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Item List */
+        .item-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .item-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .item-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .item-list::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 3px;
+        }
+
+        .item-card {
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .item-card:hover {
+            background: var(--bg-hover);
+            border-color: var(--border);
+        }
+
+        .item-card.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(168, 85, 247, 0.1));
+            border-color: var(--accent-cyan);
+        }
+
+        .item-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .item-index {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--bg-primary);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .item-reward {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .item-reward.correct {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+
+        .item-reward.incorrect {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+
+        .item-reward.partial {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        .item-preview {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .content-header {
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .content-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+
+        .content-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .content-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content-body::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 4px;
+        }
+
+        /* Detail Sections */
+        .detail-section {
+            margin-bottom: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
+        }
+
+        .section-content {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .prompt-content, .response-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .response-content {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+        }
+
+        /* Tags in content */
+        .tag-think {
+            background: rgba(168, 85, 247, 0.15);
+            color: var(--accent-purple);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .tag-answer {
+            background: rgba(0, 212, 255, 0.15);
+            color: var(--accent-cyan);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Ground Truth & Metrics */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-tertiary);
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .metric-value.highlight {
+            color: var(--accent-cyan);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Keyboard shortcuts hint */
+        .shortcuts-hint {
+            padding: 12px 24px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+
+        .shortcut {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        kbd {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            border: 1px solid var(--border);
+        }
+
+        /* File input styling */
+        .file-input-container {
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 20px;
+        }
+
+        .file-input-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-secondary);
+        }
+
+        .file-input-label:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-tertiary);
+        }
+
+        .file-input-label svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .file-input-label span {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+        }
+
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Qwen Results Viewer</h1>
+                <p id="file-name">No file loaded</p>
+            </div>
+            
+            <div class="stats-container" id="stats-container" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value total" id="stat-total">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value success" id="stat-correct">0</div>
+                    <div class="stat-label">Correct</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value error" id="stat-incorrect">0</div>
+                    <div class="stat-label">Incorrect</div>
+                </div>
+            </div>
+
+            <div class="filters" id="filters" style="display: none;">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="correct">✓ Correct</button>
+                <button class="filter-btn" data-filter="incorrect">✗ Incorrect</button>
+                <button class="filter-btn" data-filter="partial">◐ Partial</button>
+            </div>
+
+            <div class="search-container" id="search-container" style="display: none;">
+                <input type="text" class="search-input" id="search-input" placeholder="Search prompts or answers...">
+            </div>
+
+            <div class="item-list" id="item-list">
+                <div class="file-input-container">
+                    <label class="file-input-label" for="file-input">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span>Drop JSONL file or click to browse</span>
+                    </label>
+                    <input type="file" id="file-input" accept=".jsonl,.json">
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                        <button class="nav-btn load-preset" data-file="qwen_test_results.jsonl">
+                            Load qwen_test_results.jsonl
+                        </button>
+                        <button class="nav-btn load-preset" data-file="data/gsm8k/train_sft.jsonl">
+                            Load gsm8k/train_sft.jsonl
+                        </button>
+                        <button class="nav-btn load-preset" data-file="data/gsm8k/test_sft.jsonl">
+                            Load gsm8k/test_sft.jsonl
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shortcuts-hint" id="shortcuts-hint" style="display: none;">
+                <div class="shortcut"><kbd>↑</kbd><kbd>↓</kbd> Navigate</div>
+                <div class="shortcut"><kbd>J</kbd><kbd>K</kbd> Prev/Next</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-header" id="content-header" style="display: none;">
+                <div class="nav-buttons">
+                    <button class="nav-btn" id="prev-btn" disabled>
+                        <span>←</span> Previous
+                    </button>
+                    <button class="nav-btn" id="next-btn" disabled>
+                        Next <span>→</span>
+                    </button>
+                </div>
+                <div id="position-indicator" style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.85rem;"></div>
+            </div>
+            
+            <div class="content-body" id="content-body">
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <p>Load a JSONL file to view results</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // State
+        let data = [];
+        let filteredData = [];
+        let currentIndex = 0;
+        let currentFilter = 'all';
+
+        // DOM Elements
+        const itemList = document.getElementById('item-list');
+        const contentBody = document.getElementById('content-body');
+        const statsContainer = document.getElementById('stats-container');
+        const filtersContainer = document.getElementById('filters');
+        const searchContainer = document.getElementById('search-container');
+        const shortcutsHint = document.getElementById('shortcuts-hint');
+        const contentHeader = document.getElementById('content-header');
+        const fileNameEl = document.getElementById('file-name');
+        const searchInput = document.getElementById('search-input');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const positionIndicator = document.getElementById('position-indicator');
+
+        // File handling
+        document.getElementById('file-input').addEventListener('change', handleFileSelect);
+        document.querySelectorAll('.load-preset').forEach(btn => {
+            btn.addEventListener('click', () => loadPresetFile(btn.dataset.file));
+        });
+
+        // Drag and drop
+        itemList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            itemList.style.background = 'var(--bg-hover)';
+        });
+
+        itemList.addEventListener('dragleave', () => {
+            itemList.style.background = '';
+        });
+
+        itemList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            itemList.style.background = '';
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) loadFile(file);
+        }
+
+        async function loadPresetFile(filePath) {
+            try {
+                const response = await fetch(filePath);
+                if (!response.ok) throw new Error('File not found');
+                const text = await response.text();
+                const fileName = filePath.split('/').pop();
+                parseAndLoadData(text, fileName);
+            } catch (error) {
+                alert(`Could not load file: ${filePath}. Make sure the file exists.`);
+            }
+        }
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                parseAndLoadData(e.target.result, file.name);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseAndLoadData(text, fileName) {
+            const lines = text.trim().split('\n');
+            data = lines.map((line, idx) => {
+                try {
+                    const parsed = JSON.parse(line);
+                    parsed._index = idx;
+                    
+                    // Normalize different formats
+                    // Handle 'response' field (used in train_sft.jsonl)
+                    if (parsed.response && !parsed.generated_text) {
+                        parsed.generated_text = parsed.response;
+                    }
+                    
+                    // Extract answer from response if no ground_truth exists
+                    if (!parsed.ground_truth && parsed.generated_text) {
+                        const answerMatch = parsed.generated_text.match(/<answer>\s*([\s\S]*?)\s*<\/answer>/);
+                        if (answerMatch) {
+                            parsed._extracted_answer = answerMatch[1].trim();
+                        }
+                    }
+                    
+                    // Mark the data type
+                    parsed._hasMetrics = !!(parsed.metrics);
+                    parsed._dataType = parsed.metrics ? 'evaluation' : 'training';
+                    
+                    return parsed;
+                } catch (e) {
+                    console.error(`Error parsing line ${idx}:`, e);
+                    return null;
+                }
+            }).filter(Boolean);
+
+            fileNameEl.textContent = `${fileName} (${data.length} items)`;
+            initializeUI();
+        }
+
+        function initializeUI() {
+            statsContainer.style.display = 'flex';
+            filtersContainer.style.display = 'flex';
+            searchContainer.style.display = 'block';
+            shortcutsHint.style.display = 'flex';
+            contentHeader.style.display = 'flex';
+
+            updateStats();
+            setupFilters();
+            setupSearch();
+            setupNavigation();
+            setupKeyboardShortcuts();
+            
+            applyFilter('all');
+        }
+
+        function updateStats() {
+            const total = data.length;
+            const hasMetrics = data.some(d => d._hasMetrics);
+            
+            if (hasMetrics) {
+                const correct = data.filter(d => d.metrics?.reward === 1).length;
+                document.getElementById('stat-correct').textContent = correct;
+                document.getElementById('stat-incorrect').textContent = total - correct;
+                document.getElementById('stat-correct').parentElement.style.display = '';
+                document.getElementById('stat-incorrect').parentElement.style.display = '';
+            } else {
+                // For training data without metrics, hide correct/incorrect stats
+                document.getElementById('stat-correct').parentElement.style.display = 'none';
+                document.getElementById('stat-incorrect').parentElement.style.display = 'none';
+            }
+            
+            document.getElementById('stat-total').textContent = total;
+            
+            // Show/hide filter buttons based on data type
+            const filterBtns = document.querySelectorAll('.filter-btn[data-filter="correct"], .filter-btn[data-filter="incorrect"], .filter-btn[data-filter="partial"]');
+            filterBtns.forEach(btn => {
+                btn.style.display = hasMetrics ? '' : 'none';
+            });
+        }
+
+        function setupFilters() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.filter;
+                    applyFilter(currentFilter);
+                });
+            });
+        }
+
+        function setupSearch() {
+            searchInput.addEventListener('input', (e) => {
+                applyFilter(currentFilter, e.target.value);
+            });
+        }
+
+        function setupNavigation() {
+            prevBtn.addEventListener('click', () => navigateTo(currentIndex - 1));
+            nextBtn.addEventListener('click', () => navigateTo(currentIndex + 1));
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                
+                switch(e.key) {
+                    case 'ArrowUp':
+                    case 'k':
+                        e.preventDefault();
+                        navigateTo(currentIndex - 1);
+                        break;
+                    case 'ArrowDown':
+                    case 'j':
+                        e.preventDefault();
+                        navigateTo(currentIndex + 1);
+                        break;
+                }
+            });
+        }
+
+        function applyFilter(filter, searchTerm = searchInput.value) {
+            filteredData = data.filter(item => {
+                // Filter by reward
+                let passesFilter = true;
+                if (filter === 'correct') {
+                    passesFilter = item.metrics?.reward === 1;
+                } else if (filter === 'incorrect') {
+                    passesFilter = item.metrics?.reward === 0;
+                } else if (filter === 'partial') {
+                    passesFilter = item.metrics?.reward > 0 && item.metrics?.reward < 1;
+                }
+
+                // Filter by search term
+                let passesSearch = true;
+                if (searchTerm) {
+                    const term = searchTerm.toLowerCase();
+                    passesSearch = 
+                        item.prompt?.toLowerCase().includes(term) ||
+                        item.generated_text?.toLowerCase().includes(term) ||
+                        item.ground_truth?.toLowerCase().includes(term);
+                }
+
+                return passesFilter && passesSearch;
+            });
+
+            renderItemList();
+            if (filteredData.length > 0) {
+                navigateTo(0);
+            } else {
+                contentBody.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔍</div>
+                        <p>No results match your filters</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderItemList() {
+            itemList.innerHTML = filteredData.map((item, idx) => {
+                let rewardBadge = '';
+                if (item._hasMetrics) {
+                    const rewardClass = item.metrics?.reward === 1 ? 'correct' : 
+                                       item.metrics?.reward === 0 ? 'incorrect' : 'partial';
+                    const rewardText = item.metrics?.reward === 1 ? '✓ Correct' : 
+                                      item.metrics?.reward === 0 ? '✗ Wrong' : 
+                                      `◐ ${(item.metrics?.reward * 100).toFixed(0)}%`;
+                    rewardBadge = `<span class="item-reward ${rewardClass}">${rewardText}</span>`;
+                } else {
+                    rewardBadge = `<span class="item-reward" style="background: rgba(0, 212, 255, 0.15); color: var(--accent-cyan);">Training</span>`;
+                }
+                
+                // Extract question from prompt (after "User:")
+                const userMatch = item.prompt?.match(/User:\s*([\s\S]*?)(?:Assistant:|$)/);
+                const preview = userMatch ? userMatch[1].trim().substring(0, 100) : item.prompt?.substring(0, 100);
+                
+                return `
+                    <div class="item-card ${idx === currentIndex ? 'active' : ''}" data-index="${idx}">
+                        <div class="item-header">
+                            <span class="item-index">#${item._index + 1}</span>
+                            ${rewardBadge}
+                        </div>
+                        <div class="item-preview">${escapeHtml(preview)}...</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.item-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    navigateTo(parseInt(card.dataset.index));
+                });
+            });
+        }
+
+        function navigateTo(index) {
+            if (index < 0 || index >= filteredData.length) return;
+            
+            currentIndex = index;
+            
+            // Update active state in list
+            document.querySelectorAll('.item-card').forEach((card, idx) => {
+                card.classList.toggle('active', idx === currentIndex);
+            });
+
+            // Scroll active item into view
+            const activeCard = document.querySelector('.item-card.active');
+            if (activeCard) {
+                activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Update navigation buttons
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === filteredData.length - 1;
+            positionIndicator.textContent = `${currentIndex + 1} of ${filteredData.length}`;
+
+            // Render detail view
+            renderDetail(filteredData[currentIndex]);
+        }
+
+        function renderDetail(item) {
+            // Extract the question part from the prompt
+            const promptParts = item.prompt?.split('User:') || [];
+            const systemPart = promptParts[0]?.trim() || '';
+            const userPart = promptParts[1]?.split('Assistant:')[0]?.trim() || '';
+
+            // Format the generated text with highlighted tags
+            let formattedResponse = escapeHtml(item.generated_text || '');
+            formattedResponse = formattedResponse
+                .replace(/&lt;think&gt;/g, '<span class="tag-think">&lt;think&gt;</span>')
+                .replace(/&lt;\/think&gt;/g, '<span class="tag-think">&lt;/think&gt;</span>')
+                .replace(/&lt;answer&gt;/g, '<span class="tag-answer">&lt;answer&gt;</span>')
+                .replace(/&lt;\/answer&gt;/g, '<span class="tag-answer">&lt;/answer&gt;</span>');
+
+            // Build evaluation section based on data type
+            let evaluationSection = '';
+            if (item._hasMetrics) {
+                evaluationSection = `
+                <div class="detail-section">
+                    <div class="section-header">
+                        <span class="section-title">Evaluation</span>
+                        <div class="section-line"></div>
+                    </div>
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div class="metric-label">Ground Truth</div>
+                            <div class="metric-value highlight">${escapeHtml(item.ground_truth || 'N/A')}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Format Reward</div>
+                            <div class="metric-value">${item.metrics?.format_reward?.toFixed(2) ?? 'N/A'}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Answer Reward</div>
+                            <div class="metric-value">${item.metrics?.answer_reward?.toFixed(2) ?? 'N/A'}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Total Reward</div>
+                            <div class="metric-value" style="color: ${item.metrics?.reward === 1 ? 'var(--success)' : item.metrics?.reward === 0 ? 'var(--error)' : 'var(--warning)'}">${item.metrics?.reward?.toFixed(2) ?? 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>`;
+            } else if (item._extracted_answer) {
+                evaluationSection = `
+                <div class="detail-section">
+                    <div class="section-header">
+                        <span class="section-title">Extracted Answer</span>
+                        <div class="section-line"></div>
+                    </div>
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div class="metric-label">Answer</div>
+                            <div class="metric-value highlight">${escapeHtml(item._extracted_answer)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Data Type</div>
+                            <div class="metric-value" style="color: var(--accent-cyan);">Training Example</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            contentBody.innerHTML = `
+                <div class="detail-section">
+                    <div class="section-header">
+                        <span class="section-title">Question</span>
+                        <div class="section-line"></div>
+                    </div>
+                    <div class="section-content">
+                        <div class="prompt-content">${escapeHtml(userPart)}</div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <span class="section-title">${item._hasMetrics ? 'Model Response' : 'Reference Response'}</span>
+                        <div class="section-line"></div>
+                    </div>
+                    <div class="section-content">
+                        <div class="response-content">${formattedResponse}</div>
+                    </div>
+                </div>
+
+                ${evaluationSection}
+
+                ${systemPart ? `
+                <div class="detail-section">
+                    <div class="section-header">
+                        <span class="section-title">System Prompt</span>
+                        <div class="section-line"></div>
+                    </div>
+                    <div class="section-content">
+                        <div class="prompt-content" style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(systemPart)}</div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+
+            // Re-render MathJax
+            if (window.MathJax) {
+                MathJax.typesetPromise([contentBody]).catch(err => console.log('MathJax error:', err));
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
+
