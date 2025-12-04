@@ -44,7 +44,7 @@ def process_example(example, template):
     
     # Construct the response with <think> and <answer> tags
     # Note: prompt ends with <think>, so response starts with content
-    response = f"{reasoning}</think><answer>{answer}</answer>"
+    response = f"{reasoning}</think> <answer>{answer}</answer>"
     
     return {
         "prompt": prompt,
