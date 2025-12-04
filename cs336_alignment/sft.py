@@ -191,7 +191,7 @@ def log_generations(
         # Ensure result directory exists
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
-        result_dir = os.path.join(project_root, "result")
+        result_dir = os.path.join(project_root, "results")
         os.makedirs(result_dir, exist_ok=True)
         
         output_path = os.path.join(result_dir, output_file)
@@ -404,7 +404,8 @@ def main():
         prompts=test_prompts,
         ground_truths=test_ground_truths,
         reward_fn=r1_zero_reward_fn,
-        print_examples=args.print_examples
+        print_examples=args.print_examples,
+        output_file="gsm8k_validation_results.jsonl"
     )
     
     # Validation on Math12K
@@ -440,7 +441,8 @@ def main():
         prompts=val_prompts,
         ground_truths=val_ground_truths,
         reward_fn=r1_zero_reward_fn,
-        print_examples=args.print_examples
+        print_examples=args.print_examples,
+        output_file="math12k_validation_results.jsonl"
     )
 
 
