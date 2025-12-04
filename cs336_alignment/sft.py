@@ -96,17 +96,24 @@ def log_generations(
     labels = tokenized_data["labels"]
     response_mask = tokenized_data["response_mask"]
 
-    # Calculate entropy and log probs in batches to avoid OOM
+    # Calculate entropy and log probs one sample at a time to avoid OOM
+    # GPU memory is constrained due to vLLM + policy model both loaded
+    torch.cuda.empty_cache()
     all_token_entropies = []
     with torch.no_grad():
-        for i in range(0, len(prompts), batch_size):
-            batch_input_ids = input_ids[i:i + batch_size].to(policy.device)
-            batch_labels = labels[i:i + batch_size].to(policy.device)
+        for i in range(len(prompts)):
+            batch_input_ids = input_ids[i:i + 1].to(policy.device)
+            batch_labels = labels[i:i + 1].to(policy.device)
             
             log_probs_dict = get_response_log_probs(
                 policy, batch_input_ids, batch_labels, return_token_entropy=True
             )
             all_token_entropies.append(log_probs_dict["token_entropy"].cpu())
+            
+            # Free GPU memory after each sample
+            del batch_input_ids, batch_labels, log_probs_dict
+            if i % 10 == 0:
+                torch.cuda.empty_cache()
     
     token_entropies = torch.cat(all_token_entropies, dim=0)
     response_mask = response_mask  # Keep on CPU for indexing
@@ -308,8 +315,8 @@ def main():
                     formatted_prompt = prompt_template.format(question=question)
                     prompts.append(formatted_prompt)
                     ground_truths.append(solution)
-            
-            print(f"Loaded {len(prompts)} examples from Math12K")
+                
+                print(f"Loaded {len(prompts)} examples from Math12K")
         
         log_generations(
             llm=llm,
