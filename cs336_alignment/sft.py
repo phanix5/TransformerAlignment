@@ -236,14 +236,36 @@ def main():
     parser.add_argument("--micro-batch-size", type=int, default=5, help="Microbatch size for gradient accumulation")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--save-trained", type=str, nargs='?', const="default", help="Relative path to save trained model. Defaults to data/trained_models if flag is present but no path provided.")
+    parser.add_argument("--use-trained", type=str, nargs='?', const="default", help="Load previously trained model for generation. Defaults to data/trained_models if flag is present but no path provided.")
     parser.add_argument("--print-examples", action="store_true", help="Print generation examples during validation")
     parser.add_argument("--output", type=str, default="sft_results.jsonl", help="Output file for generation results (default: sft_results.jsonl)")
     args = parser.parse_args()
 
-    llm = init_vllm("Qwen/Qwen2.5-Math-1.5B", "cuda", 1)
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-Math-1.5B") # load pretrained tokenizer from model
+    # Determine model path based on --use-trained flag
+    base_model_id = "Qwen/Qwen2.5-Math-1.5B"
+    
+    if args.use_trained and args.generate:
+        # Resolve the trained model path
+        if args.use_trained == "default":
+            trained_model_relative_path = "data/trained_models"
+        else:
+            trained_model_relative_path = args.use_trained
+            
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        model_path = os.path.join(project_root, trained_model_relative_path)
+        
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Trained model not found at {model_path}. Run training with --save-trained first.")
+        
+        print(f"Loading trained model from {model_path}...")
+    else:
+        model_path = base_model_id
+
+    llm = init_vllm(model_path, "cuda", 1)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     preTrainedModel = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen2.5-Math-1.5B", 
+        model_path, 
         device_map="auto", 
         torch_dtype=torch.bfloat16
     )
