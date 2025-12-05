@@ -315,13 +315,13 @@ def main():
                 print("Warning: 'test' or 'validation' split not found, using 'train'")
                 data = ds["train"]
 
-            # Select indices
+            # Select indices - default to all entries in test set
             if args.prompt_indices is not None:
                 indices = args.prompt_indices
             elif args.dataset_size is not None:
                 indices = range(args.dataset_size)
             else:
-                indices = range(200)
+                indices = range(len(data))
 
             for idx in indices:
                 if idx >= len(data):
