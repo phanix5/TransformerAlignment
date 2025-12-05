@@ -321,7 +321,7 @@ def main():
             elif args.dataset_size is not None:
                 indices = range(args.dataset_size)
             else:
-                indices = range(10)
+                indices = range(200)
 
             for idx in indices:
                 if idx >= len(data):
